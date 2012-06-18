@@ -77,6 +77,25 @@ describe 'Rack::Hoptoad' do
     end
   end
 
+  describe "when toadhopper get overwritten the notify_host" do
+    before { ENV['RACK_ENV'] = 'production' }
+    it 'instanciated the notifier_class with the host' do
+      failsafe = StringIO.new
+      notifier_mock = double()
+      notifier_mock.should_receive(:new).with(api_key, { :notify_host => "http://foo" }){ stub() }
+
+      notifier =
+        Rack::Hoptoad.new(app, api_key, 'RACK_ENV', 'http://foo') do |middleware|
+          middleware.environment_filters << 'MY_HOPTOAD_API_KEY'
+          middleware.notifier_class = notifier_mock
+          middleware.failsafe       = failsafe
+        end
+
+      lambda { notifier.call(env) }.should raise_error(TestError)
+      env['hoptoad.notified'].should eql(false)
+    end
+  end
+
   describe "when hoptoad returns an error" do
     before { ENV['RACK_ENV'] = 'production' }
     it 'outputs the errors' do

@@ -10,9 +10,9 @@ module Rack
   class Hoptoad
     class Error < StandardError; end
 
-    attr_accessor :api_key, :environment_filters, :report_under, :rack_environment, :notifier_class, :failsafe
+    attr_accessor :api_key, :environment_filters, :report_under, :rack_environment, :notifier_class, :failsafe, :notify_host
 
-    def initialize(app, api_key = nil, rack_environment = 'RACK_ENV')
+    def initialize(app, api_key = nil, rack_environment = 'RACK_ENV', notify_host = nil)
       @app                 = app
       @api_key             = api_key
       @report_under        = %w(staging production)
@@ -20,6 +20,7 @@ module Rack
       @environment_filters = %w(AWS_ACCESS_KEY  AWS_SECRET_ACCESS_KEY AWS_ACCOUNT SSH_AUTH_SOCK)
       @notifier_class      = Toadhopper
       @failsafe            = $stderr
+      @notify_host         = notify_host
       yield self if block_given?
     end
 
@@ -45,7 +46,9 @@ module Rack
         "^#{Regexp.escape(wrapped_key_for(key))}$"
       end
     end
+
   private
+
     def report?
       report_under.include?(rack_env)
     end
@@ -88,9 +91,15 @@ module Rack
     end
 
     def toadhopper
-      toad         = @notifier_class.new(api_key)
+      toad         = @notifier_class.new(api_key, toadhopper_options)
       toad.filters = environment_filter_regexps
       toad
+    end
+
+    def toadhopper_options
+      options = Hash.new
+      options[:notify_host] = notify_host  if notify_host
+      options
     end
 
     def environment_data_for(env)
